@@ -1,0 +1,21 @@
+# MedQG Requirements
+
+# Core dependencies
+openai == 0.27.2
+pandas == 1.4.4
+tqdm == 4.49.0
+python-dotenv
+pydantic
+requests
+scikit-learn
+
+# LangChain ecosystem
+langchain >= 0.1.0
+langgraph >= 0.0.20
+
+# Embeddings
+InstructorEmbedding
+sentence-transformers
+
+# Optional: Experiment tracking
+wandb == 0.13.2

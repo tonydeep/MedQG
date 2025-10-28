@@ -12,11 +12,24 @@ import ast
 from pathlib import Path
 from langchain.output_parsers import StructuredOutputParser, ResponseSchema
 
-from langchain import PromptTemplate,FewShotPromptTemplate
+try:
+    from langchain import PromptTemplate, FewShotPromptTemplate
+except ImportError:
+    from langchain.prompts import PromptTemplate, FewShotPromptTemplate
 from langchain.output_parsers import PydanticOutputParser
-from langchain.llms import OpenAI
-from langchain.chat_models import ChatOpenAI
-from langchain.chains import LLMChain,SequentialChain
+try:
+    from langchain.llms import OpenAI
+except ImportError:
+    from langchain_openai import OpenAI
+try:
+    from langchain.chat_models import ChatOpenAI
+except ImportError:
+    from langchain_openai import ChatOpenAI
+try:
+    from langchain.chains import LLMChain, SequentialChain
+except ImportError:
+    from langchain.chains.llm import LLMChain
+    from langchain.chains.sequential import SequentialChain
 
 from src.usmle.models.usmle_qtn_a import UsmleQtnAns
 from src.usmle.models.usmle_whl_qtn import UsmleWholeQtn

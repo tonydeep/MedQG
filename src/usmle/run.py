@@ -1,136 +1,35 @@
+"""
+MedQG Question Generation - LangGraph Refactored Version
+
+This module provides the main entry points for USMLE question generation
+using LangGraph-based orchestration.
+"""
+
 import json
 import os
-import pathlib
-import random
 from tqdm import tqdm
-from typing import List
-import re
-from usmle.archive.task_init import UsmleQgenTaskInit
-from src.usmle.task_iterate import UsmleQgenTaskIterate
-from usmle.archive.feedback import UsmleQgenFeedback
-from src.usmle.answer import UsmleQgenAnswer
 from src.utils import retry_parse_fail_prone_cmd
-import ast
-from src.usmle.feedback_lgc import UsmleQgenFeedbackLgc
-from src.usmle.gen_order import gen_order
+from src.usmle.question_graph import QuestionGenerationGraph
 
-from src.usmle.task_init_lgc import UsmleQgenTaskInitLgc
-CODEX = "code-davinci-002"
-GPT3 = "text-davinci-003"
-CHATGPT = "gpt-3.5-turbo"
 ENGINE = os.getenv("ENGINE")
 
+
 @retry_parse_fail_prone_cmd
-def autofb_usmleqgen(clinical_note: str, keypoint: str, topic: str, max_attempts: int) -> str:
+def autofb_usmleqgen(clinical_note: str, keypoint: str, topic: str, max_attempts: int) -> list:
+    """
+    Generate USMLE question with automatic feedback and refinement using LangGraph.
 
-    # initialize all the required components
-    task_init_lgc = UsmleQgenTaskInitLgc(engine=ENGINE, prompt_examples="data/prompt/usmle/init.jsonl")
-    # getting feedback
-    task_answer = UsmleQgenAnswer(
-        engine= ENGINE,prompt_examples="data/prompt/usmle/answer.jsonl"
-    )
-    task_feedback_lgc = UsmleQgenFeedbackLgc(
-        engine=ENGINE, prompt_examples="data/prompt/usmle/feedback.jsonl", rubrics_path="data/prompt/usmle/reasoning_rubrics.jsonl"
-    )
-    # iteratively improving the sentence
-    task_iterate = UsmleQgenTaskIterate(
-        engine=ENGINE, prompt_examples="data/prompt/usmle/iterate.jsonl"
-    )
+    Args:
+        clinical_note: Clinical note text
+        keypoint: Test keypoint/concept
+        topic: USMLE topic
+        max_attempts: Maximum refinement iterations
 
-    # Initialize the task
-
-    n_attempts = 0
-
-    print(f"{n_attempts} INIT> {clinical_note}\n{keypoint}\n{topic}")
-    content_to_fb_ret = []
-    context_score,question_score,correct_answer_score,distractor_option_score, reasoning_score = '0/1','0/1','0/1','0/1','0/1'
-    while n_attempts < max_attempts and check_stop(context_score,question_score,correct_answer_score,distractor_option_score,reasoning_score):
-        print()
-
-        if n_attempts == 0:
-            context,question,correct_answer,distractor_options = task_init_lgc(clinical_note=clinical_note,keypoint=keypoint,topic=topic,order_enum=gen_order.step_by_step)
-            attempted_answer, reasoning = task_answer(context=context,question=question, options=generate_options(distractor_options=distractor_options,correct_answer=correct_answer))
-        else:
-
-            context,question,correct_answer,distractor_options = task_iterate(clinical_note=clinical_note,keypoint=keypoint,topic=topic,content_to_fb=content_to_fb)
-            attempted_answer, reasoning = task_answer(context=context,question=question,options=generate_options(distractor_options=distractor_options,correct_answer=correct_answer))
-
-        print(f"{n_attempts} GEN> Context: {context}\nQuestion: {question}\nCorrect answer:{correct_answer}\nDistractor options:{distractor_options}")
-
-        context_feedback, context_score, question_feedback, question_score, reasoning_feedback, reasoning_score, correct_answer_feedback, correct_answer_score, distractor_option_feedback, distractor_option_score = task_feedback_lgc(
-        clinical_note=clinical_note,
-        keypoint=keypoint,
-        topic=topic,
-        context=context,
-        question=question,
-        correct_answer=correct_answer,
-        distractor_options=distractor_options,
-        attempted_answer=attempted_answer,
-        reasoning=reasoning)
-        content_to_fb = [{
-                "context": context,
-                "question": question,
-                "topic": topic,
-                "keypoint" : keypoint,
-                "attempted_answer" : attempted_answer,
-                "reasoning" : reasoning,
-                "correct_answer" : correct_answer,
-                "distractor_options" : distractor_options,
-                "context_feedback": context_feedback,
-                "context_score":  context_score,
-                "question_feedback": question_feedback,
-                "question_score": question_score,
-                "correct_answer_feedback" : correct_answer_feedback,
-                "correct_answer_score" : correct_answer_score,
-                "distractor_option_feedback": distractor_option_feedback,
-                "distractor_option_score": distractor_option_score,
-                "reasoning_feedback" : reasoning_feedback,
-                "reasoning_score" : reasoning_score
-            }]
-        content_to_fb_ret.append(
-            content_to_fb[0]
-        )
-        
-        print(f"{n_attempts} Context score> {context_score} | Question score> {question_score} |  Correct answer score> {correct_answer_score} | Distractor option score> {distractor_option_score} | Reasoning score> {reasoning_score}")
-        
-        n_attempts += 1
-    return content_to_fb_ret
-def check_stop(context_score,question_score,correct_answer_score,distractor_option_score,reasoning_score):
-    if get_dec_score(context_score)  >= 0.9 and get_dec_score(reasoning_score)  >= 0.9 and get_dec_score(question_score)  >= 0.9 and get_dec_score(correct_answer_score)  >= 0.9 and get_dec_score(distractor_option_score)  >= 0.9:
-        print("===== Stop condition met ======\n\n")
-        return False
-    return True
-def get_dec_score(score):
-    split = score.split('/')
-    num = int(re.sub("[^0-9]", "", split[0]))
-    deno = int(re.sub("[^0-9]", "", split[1]))
-    print(num/deno)
-    return num/deno
-def generate_options(distractor_options,correct_answer):
-    print(f"distact : {distractor_options}")
-    distractor_options = distractor_options.replace('\n','')
-    distractor_options = distractor_options.replace(' :',':')
-    
-    ustr = ') ' if 'a)' in distractor_options.lower() else ': '
-    option_key_list = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O']
-    distractor_options_list = [correct_answer]
-    for key in option_key_list:
-        key += ustr
-        try:
-            opt =  re.search(re.escape(key)+r"(.*?)" + re.escape(key), distractor_options, re.IGNORECASE).group(1)
-            print(opt[:-1])
-            distractor_options_list.append(opt[:-1].strip())
-        except:
-            print(f"Except : {distractor_options}")
-            opt =  re.search(re.escape(key)+r"(.*)", distractor_options,re.IGNORECASE).group(1)
-            print(opt)
-            distractor_options_list.append(opt.strip())
-            break
-    random.shuffle(distractor_options_list)
-    options = ''
-    for k in range(len(distractor_options_list)):
-        options += option_key_list[k] +' : ' + distractor_options_list[k]
-    return options
+    Returns:
+        List of iteration results with feedback
+    """
+    graph = QuestionGenerationGraph(engine=ENGINE)
+    return graph.generate(clinical_note, keypoint, topic, max_attempts)
 def run_cmd():
     concepts = sys.argv[2:]
     max_attempts = 5

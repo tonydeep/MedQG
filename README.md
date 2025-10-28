@@ -11,7 +11,23 @@ This repository contains the source code for our paper to be presented at NAACL 
 
 The approach combines iterative feedback and refinement, aimed at aligning with clinical education standards. The full research paper, detailing the methodology and findings, is available [here on arXiv](https://arxiv.org/abs/2410.13191).
 
-The code is compatible with **GPT-3.5** and **GPT-4** chat completion APIs from OpenAI and employs a retriever model to enhance context-specificity. 
+The code is compatible with **GPT-3.5** and **GPT-4** chat completion APIs from OpenAI and employs a retriever model to enhance context-specificity.
+
+## 🔄 LangGraph Refactoring
+
+This codebase has been refactored to use **[LangGraph](https://python.langchain.com/docs/langgraph)** for workflow orchestration, replacing manual while-loop orchestration with a stateful, graph-based approach. The refactoring provides:
+
+- ✅ Better code organization and maintainability
+- ✅ Clear workflow visualization
+- ✅ Easier testing and debugging
+- ✅ Foundation for advanced features (human-in-the-loop, persistence, parallel execution)
+- ✅ **Full backward compatibility** - all existing scripts work without modification
+
+**📖 See [LANGGRAPH_REFACTORING.md](LANGGRAPH_REFACTORING.md) for detailed documentation on:**
+- Architecture changes and benefits
+- New graph-based APIs
+- Migration guide
+- Advanced features and future enhancements 
 
 ## Quick Start
 
